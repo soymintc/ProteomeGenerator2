@@ -1,9 +1,9 @@
 directories:
-  working_and_output_dir: "/data/kentsis/t/2-23_RPE_re-sorted"
-  PG2_installation_dir: "~/proteomegenerator"
+  working_and_output_dir: "/lila/data/shahlab/chois7/work/sarcoma/pg2" #"/data/kentsis/t/2-23_RPE_re-sorted"
+  PG2_installation_dir: "/lila/data/shahlab/chois7/packages/ProteomeGenerator2" #"~/proteomegenerator"
   
   optional:
-    temp_dir: "/scratch/kwokn" # scratch directory for intermediate file storage
+    temp_dir: "/lila/data/shahlab/chois7/work/sarcoma/tmp" # "/scratch/kwokn" # scratch directory for intermediate file storage
 
 stock_references:
   genome:
