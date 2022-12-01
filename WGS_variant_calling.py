@@ -50,7 +50,7 @@ just_ran_WGS_preprocessing = config['user_defined_workflow']['genome_personaliza
 
 subworkflow WGS_preprocessing:
     snakefile: "WGS_preprocessing.py"
-    configfile: workflow.overwrite_configfile
+    configfile: "/juno/work/shah/users/chois7/tickets/sarcoma89/pg2/AK-RT-003/AK-RT-003.woprot.yaml" #workflow.overwrite_configfile
     workdir: WD
 
 snakemake.utils.makedirs('out/logs/variant_calling/intervals')
@@ -158,7 +158,7 @@ rule var_germ_TMP_merge_genotyped:
     conda: "envs/gatk4.yaml"
     shell: "picard MergeVcfs $(echo '{input.vcf}' | sed -r 's/[^ ]+/I=&/g') O={output}"
 
-is_whole_genome_or_exome = config['input_files']['genome_personalization_module']['whole_genome_or_exome']
+is_whole_genome_or_exome = True #config['input_files']['genome_personalization_module']['whole_genome_or_exome']
 if is_whole_genome_or_exome:
     rule var_germ_TMP_CNN1D_ScoreVariants:
         input: vcf="out/{study_group}/variant_calling/HTC-scattered/{sample}.HTC.genotyped.merged.vcf"

@@ -4,7 +4,9 @@ channels:
   - r
   - defaults
   - conda-forge
+  - anaconda
 dependencies:
   - bcftools=1.10.2
   - samtools=1.10
   - picard=2.18.21=0
+  - libopenblas

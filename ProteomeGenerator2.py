@@ -7,7 +7,8 @@ import os.path
 
 #Initialize home/working/output directories
 PG2_HOME = config['directories']['PG2_installation_dir']
-WD = config["directories"]["working_and_output_dir"]
+WD = str(config["directories"]["working_and_output_dir"])
+#print("%r" % WD, type(WD))
 workdir: WD
 TMP = config["directories"]['optional']["temp_dir"]
 
@@ -94,7 +95,7 @@ if RNA_seq_module_enabled:
                 CONTROL_SAMPLES.append(s)
                 SAMPLE_REPLICATE_DICT[(s,ctrl_group)] = replicates
         SAMPLE_DICT[('fastq',exp_group)]=list(set(EXPERIMENT_SAMPLES)-set(BAM_SAMPLES))
-	SAMPLE_DICT[('fastq',ctrl_group)]=list(set(CONTROL_SAMPLES)-set(BAM_SAMPLES))
+    SAMPLE_DICT[('fastq',ctrl_group)]=list(set(CONTROL_SAMPLES)-set(BAM_SAMPLES))
     
     STUDY_GROUPS = [exp_group, ctrl_group] if len(CONTROL_SAMPLES)>0 else [exp_group]
     SAMPLE_DICT[exp_group] = EXPERIMENT_SAMPLES
@@ -161,22 +162,22 @@ out/{study_group}/MaxQuant/combined/txt/summary.txt : MaxQuant (MQ) summary stat
 out/{study_group}/novel_analysis/{mutation_type}/combined.{mutation_type}.map : tabular map of all mutations of a given type, for which there is peptide-level evidence 
 """
 rule all:
-    input: expand("out/{study_group}/combined.proteome.unique.fasta",study_group=STUDY_GROUPS), \
-           expand("out/{study_group}/combined.proteome.bed",study_group=STUDY_GROUPS), \
-           expand("out/{study_group}/novel_analysis/{mutation_type}/{chr}.{mutation_type}.analysis",study_group=STUDY_GROUPS,mutation_type=['missense','insertions','deletions','frameshifts'],chr=CHROMOSOMES), \
-           #expand("out/{study_group}/MaxQuant/combined/txt/summary.txt",study_group=STUDY_GROUPS), \
-           expand("out/{study_group}/novel_analysis/{mutation_type}/combined.{mutation_type}.map",study_group=STUDY_GROUPS,mutation_type=['missense','insertions','deletions','frameshifts'])
-"""
-           expand("out/{study_group}/novel_analysis/frameshifts/combined.frameshifts.map",study_group=STUDY_GROUPS), \
-           expand("out/{study_group}/novel_analysis/missense/combined.missense.map",study_group=STUDY_GROUPS), \
-           expand("out/{study_group}/novel_analysis/insertions/combined.insertions.map",study_group=STUDY_GROUPS), \
-           expand("out/{study_group}/novel_analysis/deletions/combined.deletions.map",study_group=STUDY_GROUPS)
-"""
+    input: 
+        expand("out/{study_group}/novel_analysis/{mutation_type}/{chr}.{mutation_type}.analysis",study_group=STUDY_GROUPS,mutation_type=['missense','insertions','deletions','frameshifts'],chr=CHROMOSOMES), 
+        expand("out/{study_group}/novel_analysis/{mutation_type}/combined.{mutation_type}.map",study_group=STUDY_GROUPS,mutation_type=['missense','insertions','deletions','frameshifts']),
+        expand("out/{study_group}/novel_analysis/frameshifts/combined.frameshifts.map",study_group=STUDY_GROUPS), 
+        expand("out/{study_group}/novel_analysis/missense/combined.missense.map",study_group=STUDY_GROUPS), 
+        expand("out/{study_group}/novel_analysis/insertions/combined.insertions.map",study_group=STUDY_GROUPS), 
+        expand("out/{study_group}/novel_analysis/deletions/combined.deletions.map",study_group=STUDY_GROUPS)
+        #expand("out/{study_group}/combined.proteome.unique.fasta",study_group=STUDY_GROUPS), 
+        #expand("out/{study_group}/combined.proteome.bed",study_group=STUDY_GROUPS), 
+        #expand("out/{study_group}/MaxQuant/combined/txt/summary.txt",study_group=STUDY_GROUPS), 
+
 # Subworkflows are invoked on rule inputs, and are executed first
 subworkflow create_custom_genome:
     snakefile: "genome_personalization_module.py"
-    configfile: workflow.overwrite_configfile
     workdir: WD
+    #configfile: workflow.overwrite_config
 
 include: 'novel_analysis.py'
 
@@ -185,7 +186,7 @@ include: 'novel_analysis.py'
 rna_seq_read_length = config['input_files']['RNA-seq_module']['read_length']
 reads_are_paired_end = config['input_files']['RNA-seq_module']['reads_are_paired_end']
 
-SJ_OVERHANG = int(rna_seq_read_length/2)-1 if reads_are_paired_end else rna_seq_read_length-1
+SJ_OVERHANG = 149 #int(rna_seq_read_length/2)-1 if reads_are_paired_end else rna_seq_read_length-1
 MAX_SEEDS_PER_WINDOW=config['parameters']['RNA-seq_module']['STAR_alignment']['advanced']['max_seeds_per_window']
 MAX_INTRON_LENGTH=config['parameters']['RNA-seq_module']['STAR_alignment']['advanced']['max_intron_length']
 MAX_MATES_GAP=config['parameters']['RNA-seq_module']['STAR_alignment']['advanced']['max_mates_gap']
