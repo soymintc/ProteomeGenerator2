@@ -449,7 +449,8 @@ rule main_02_ORF_CalculateCandidateORFs:
     output: "out/{study_group}/haplotype-{htype}/{track}/transcripts.fasta.transdecoder_dir/longest_orfs.pep",checkpoint_dir=directory("out/{study_group}/haplotype-{htype}/{track}/transcripts.fasta.transdecoder_dir.__checkpoints_longorfs/")
     conda: "envs/transdecoder.yaml"
     params: n="1", mem_per_cpu="4", R="'rusage[mem=4]'", J="LongOrfs", o="out/logs/LongOrfs.out", eo="out/logs/LongOrfs.err"
-    shell: "rm -r {output.checkpoint_dir}; cd out/{wildcards.study_group}/haplotype-{wildcards.htype}/{wildcards.track}; \
+    #shell: "rm -r {output.checkpoint_dir}; cd out/{wildcards.study_group}/haplotype-{wildcards.htype}/{wildcards.track}; \
+    shell: "cd out/{wildcards.study_group}/haplotype-{wildcards.htype}/{wildcards.track}; \
         TransDecoder.LongOrfs \
         -t transcripts.fasta \
         -m {ORF}"
@@ -488,7 +489,8 @@ rule main_03_ORF_PredictCodingRegions:
     output: "out/{study_group}/haplotype-{htype}/{track}/transcripts.fasta.transdecoder.pep",checkpoint_dir=directory("out/{study_group}/haplotype-{htype}/{track}/transcripts.fasta.transdecoder_dir.__checkpoints/"),gff3="out/{study_group}/haplotype-{htype}/{track}/transcripts.fasta.transdecoder.gff3"
     conda: "envs/transdecoder.yaml"
     params: n="1", mem_per_cpu="18", R="'rusage[mem=18]'", J="Predict", o="out/logs/Predict.out", eo="out/logs/Predict.err",single_best_only='--single_best_only' if retaining_single_best_only else ''
-    shell: "rm -r {output.checkpoint_dir};cd out/{wildcards.study_group}/haplotype-{wildcards.htype}/{wildcards.track}; {PG2_HOME}/utils/transdecoder/TransDecoder.Predict.PG2 \
+    #shell: "rm -r {output.checkpoint_dir};cd out/{wildcards.study_group}/haplotype-{wildcards.htype}/{wildcards.track}; {PG2_HOME}/utils/transdecoder/TransDecoder.Predict.PG2 \
+    shell: "cd out/{wildcards.study_group}/haplotype-{wildcards.htype}/{wildcards.track}; {PG2_HOME}/utils/transdecoder/TransDecoder.Predict.PG2 \
         -t transcripts.fasta \
         --retain_long_orfs_length {nuc_ORF} \
         -v \
