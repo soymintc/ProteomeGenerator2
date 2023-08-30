@@ -177,6 +177,7 @@ rule all:
 subworkflow create_custom_genome:
     snakefile: "genome_personalization_module.py"
     workdir: WD
+    configfile: config['config_path']
     #configfile: workflow.overwrite_config
 
 include: 'novel_analysis.py'
@@ -195,7 +196,8 @@ rule RNA_00_STAR_CreateGenomeIndex:
     input: fasta=(create_custom_genome(PG2_GENOME_FASTA) if creating_custom_genome else PG2_GENOME_FASTA),gtf=(create_custom_genome(PG2_GENOME_GTF) if creating_custom_genome else PG2_GENOME_GTF)
     output: expand("out/custom_ref/{cohort}.{{study_group}}.h-{{htype}}.STARindex/SA",cohort=(COHORT if creating_custom_genome or continuing_after_genome_personalization else os.path.basename(PG2_GENOME_FASTA).strip('.fa')))
     log: "out/logs/{study_group}/h-{htype}.index.txt"
-    conda: "envs/STAR.yaml"
+    # conda: "envs/STAR.yaml"
+    singularity: 'docker://dceoy/star:latest'
     params: directory=os.path.dirname(PG2_STAR_INDEX), n="16", mem_per_cpu="6", R="'span[hosts=1] rusage[mem=6]'", J="index", o="out/logs/index.out", eo="out/logs/index.err"
     shell: "mkdir -p {params.directory} ; \
             STAR \
@@ -208,7 +210,8 @@ if 'bam' in RNAseq_file_format:
     rule RNA_00_ExtractFastqReadsFromRNAseqBAM:
         input: lambda wildcards: config['input_files']['RNA-seq_module']['bam_inputs'][wildcards.sample]['bam_file']
         output: read_one=temp("out/temp_inputs/{sample}.bam2fq.1.fq.gz"),read_two=temp("out/temp_inputs/{sample}.bam2fq.2.fq.gz")
-        conda: "envs/STAR.yaml"
+        # conda: "envs/STAR.yaml"
+        singularity: 'docker://pegi3s/samtools_bcftools:latest',
         params: n="16", mem_per_cpu="6", R="'span[hosts=1] rusage[mem=6]'", J="RNAseq_bam2fq", o="out/logs/RNAseq/bam2fq.out", eo="out/logs/RNAseq/bam2fq.err",int_readOne=os.path.join(TMP,"{sample}.RG.bam2fq.1.fq"),int_readTwo=os.path.join(TMP,"{sample}.RG.bam2fq.2.fq")
         shell: "samtools collate -O -@ {params.n} {input} | samtools fastq -@ {params.n} -1 {params.int_readOne} -2 {params.int_readTwo} -; gzip -c {params.int_readOne} > {output.read_one}; gzip -c {params.int_readTwo} > {output.read_two}"
  
@@ -224,7 +227,8 @@ if RNA_seq_module_enabled:
                r2 = lambda wildcards: [config['input_files']['RNA-seq_module']['fastq_inputs'][wildcards.sample]['read_groups'][replicate]['R2_fq.gz'] for replicate in SAMPLE_REPLICATE_DICT[(wildcards.sample,wildcards.study_group)]] if ('fastq' in RNAseq_file_format and wildcards.sample in SAMPLE_DICT[('fastq',wildcards.study_group)]) else "out/temp_inputs/{sample}.bam2fq.2.fq.gz", \
                gtf=(create_custom_genome(PG2_GENOME_GTF) if creating_custom_genome else PG2_GENOME_GTF)
         output: "out/{study_group}/haplotype-{htype}/RNAseq/alignment/{sample}.Aligned.sortedByCoord.out.bam"
-        conda: "envs/STAR.yaml"
+        # conda: "envs/STAR.yaml"
+        singularity: 'docker://dceoy/star:latest'
         params: directory=os.path.dirname(PG2_STAR_INDEX), n="16", R="'span[hosts=1] rusage[mem=12]'", J="STAR_align", o="out/logs/RNAseq/{study_group}.haplotype-{htype}.{sample}.STAR.out", eo="out/logs/RNAseq/{study_group}.haplotype-{htype}.{sample}.STAR.err", mem_per_cpu="12", \
                 r1_formatted=lambda wildcards:','.join([REPLICATE_FILE_DICT[(wildcards.sample,rep)][0] for rep in SAMPLE_REPLICATE_DICT[(wildcards.sample,wildcards.study_group)]]) if wildcards.sample in SAMPLE_DICT[('fastq',wildcards.study_group)] else "out/temp_inputs/{sample}.bam2fq.1.fq.gz", r2_formatted=lambda wildcards:','.join([REPLICATE_FILE_DICT[(wildcards.sample,rep)][1] for rep in SAMPLE_REPLICATE_DICT[(wildcards.sample,wildcards.study_group)]]) if wildcards.sample in SAMPLE_DICT[('fastq',wildcards.study_group)] else "out/temp_inputs/{sample}.bam2fq.2.fq.gz", \
                 tmp_dir=lambda wildcards: os.path.join(TMP,'{}.{}'.format(wildcards.sample,uuid.uuid4()))
@@ -306,7 +310,8 @@ MIN_MAPQ = (255 if max_allowed_multimaps==1 else int(-10*math.log(1-(1/max_allow
 rule RNA_02_FilterLowQualityReads:
     input: bam="out/{study_group}/haplotype-{htype}/RNAseq/alignment/{sample}.Aligned.sortedByCoord.out.bam"
     output: "out/{study_group}/haplotype-{htype}/RNAseq/alignment/{sample}.Aligned.trimmed.out.bam"
-    conda: "envs/STAR.yaml"
+    # conda: "envs/STAR.yaml"
+    singularity: 'docker://pegi3s/samtools_bcftools:latest',
     params: n="8", mem_per_cpu="2", R="'span[hosts=1] rusage[mem=2]'", J="filter", o="out/logs/filter.out", eo="out/logs/filter.err", flags=bamflag_filters 
     shell: "samtools view -b -h -@ {params.n}\
                 $(echo {params.flags} | sed -r 's/[^ ]+/-F &/g') \
@@ -316,7 +321,7 @@ rule RNA_02_FilterLowQualityReads:
 rule RNA_03_IndexBAMPerSample:
     input: "out/{study_group}/haplotype-{htype}/RNAseq/alignment/{sample}.Aligned.trimmed.out.bam"
     output: "out/{study_group}/haplotype-{htype}/RNAseq/alignment/{sample}.Aligned.trimmed.out.bai"
-    conda: "envs/STAR.yaml"
+    # conda: "envs/STAR.yaml"
     params: n="1", mem_per_cpu="4", R="'rusage[mem=4]'", J="BuildBamIndex", o="out/logs/BuildBamIndex.out", eo="out/logs/BuildBamIndex.err"
     shell: "picard BuildBamIndex INPUT={input}"
 
@@ -400,10 +405,11 @@ rule arriba:
     output: fusions="out/{study_group}/haplotype-{htype}/gene_fusions/{sample}.fusions.tsv",discarded="out/{study_group}/haplotype-{htype}/gene_fusions/{sample}.fusions_discarded.tsv"
     params: n="8", mem_per_cpu="8", R="'span[hosts=1] rusage[mem=8]'", J="arriba_fusions", o="out/logs/fusions/arriba.out", eo="out/logs/arriba/fusions.err", \
             chroms=CHROMOSOMES
+    singularity: "docker://uhrigs/arriba:1.2.0"
     #conda: "envs/arriba.yaml"
     #shell: "arriba -x {input.bam} -o {output.fusions} -O {output.discarded} -a {input.fa} -g {input.gtf} -f blacklist"
     #shell: "arriba -x {input.bam} -o {output.fusions} -O {output.discarded} -a {input.fa} -g {input.gtf} -f blacklist -T -P"
-    shell: "/home/kwokn/arriba_v1.2.0/arriba -x {input.bam} -o {output.fusions} -O {output.discarded} -a {input.fa} -g {input.gtf} -f blacklist -T -P"
+    shell: "/arriba_v1.2.0/arriba -x {input.bam} -o {output.fusions} -O {output.discarded} -a {input.fa} -g {input.gtf} -f blacklist -T -P"
 
 rule CompileFusionTranscripts:
     input: lambda wildcards:expand("out/{{study_group}}/haplotype-{{htype}}/gene_fusions/{sample}.fusions.tsv",sample=SAMPLE_DICT[wildcards.study_group])

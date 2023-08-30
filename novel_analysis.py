@@ -29,7 +29,8 @@ rule BlastProteome:
     input: proteome="out/{study_group}/combined.proteome.unique.headers_adjusted.fasta", ref_db="/juno/work/shah/users/chois7/datasets/GRCh38/gencode.v31.annotation.gtf"
     output: "out/{study_group}/novel_analysis/proteome_blast.outfmt6"
     params: n="24", mem_per_cpu="3", R="'span[hosts=1] rusage[mem=3]'", J="blast_proteome", o="out/logs/blast_proteome.out", eo="out/logs/blast_proteome.err"
-    conda: "envs/blast.yaml"
+    # conda: "envs/blast.yaml"
+    singularity: "docker://ncbi/blast",
     shell: "blastp -num_threads {params.n} -query {input.proteome} -db {input.ref_db} -outfmt 6 -max_target_seqs 5 -evalue 1e-40 > {output}"
 
 #SNPEFF_DB=os.path.splitext(os.path.basename(STOCK_GENOME_GTF))[0]
@@ -38,22 +39,25 @@ rule CreateSnpEffDatabase:
     input: ref_gtf=STOCK_GENOME_GTF, genome_fa=STOCK_GENOME_FASTA, protein_fa="/juno/work/shah/users/chois7/datasets/GRCh38/gencode.v31.pc_translations.fa", snpEff_config=os.path.join(PG2_HOME,'utils/snpEff.config')
     output: genome_fa=expand("{pg2_home}/utils/snpEff_dbs/{db_name}/sequences.fa",pg2_home=PG2_HOME,db_name=SNPEFF_DB),gtf=expand("{pg2_home}/utils/snpEff_dbs/{db_name}/genes.gtf",pg2_home=PG2_HOME,db_name=SNPEFF_DB),protein_fa=expand("{pg2_home}/utils/snpEff_dbs/{db_name}/protein.fa",pg2_home=PG2_HOME,db_name=SNPEFF_DB)
     params: n="8", mem_per_cpu="4", R="'span[hosts=1] rusage[mem=4]'", J="snpeff_db", o="out/logs/snpeff_db.out", eo="out/logs/snpeff_db.err", db_name=SNPEFF_DB
-    conda: "envs/biopython.yaml"
-    shell: "ln -s /juno/work/shah/users/chois7/datasets/GRCh38/gencode.v31.pc_translations.fa {PG2_HOME}/utils/snpEff_dbs/{params.db_name}/protein.fa; ln -s {input.ref_gtf} {output.gtf}; ln -s {input.genome_fa} {output.genome_fa}; cat <( echo '{params.db_name}.genome : Human') {input.snpEff_config} > {input.snpEff_config}.new; mv {input.snpEff_config}.new {input.snpEff_config}; snpEff -Xmx32g build -c {input.snpEff_config} -gtf22 -v {params.db_name}"
+    # conda: "envs/biopython.yaml"
+    singularity: 'docker://biocontainers/snpeff:v4.1k_cv3',
+    shell: "ln -s /juno/work/shah/users/chois7/datasets/GRCh38/gencode.v31.pc_translations.fa {PG2_HOME}/utils/snpEff_dbs/{params.db_name}/protein.fa; ln -s {input.ref_gtf} {output.gtf}; ln -s {input.genome_fa} {output.genome_fa}; cat <( echo '{params.db_name}.genome : Human') {input.snpEff_config} > {input.snpEff_config}.new; mv {input.snpEff_config}.new {input.snpEff_config}; /home/biodocker/bin/snpeff -Xmx32g build -c {input.snpEff_config} -gtf22 -v {params.db_name}"
 
 rule AnnotatePredictedVariantEffects:
     input: vcf="out/{study_group}/variant_calling/{cohort}.{study_group}.variant_calling_finished.vcf.gz" if continuing_after_variant_calling else WGS_variant_calling("out/{study_group}/variant_calling/{cohort}.{study_group}.variant_calling_finished.vcf.gz"),snpEff_config=os.path.join(PG2_HOME,'utils/snpEff.config'), fa=expand("{pg2_home}/utils/snpEff_dbs/{db_name}/sequences.fa",pg2_home=PG2_HOME,db_name=SNPEFF_DB), gtf=expand("{pg2_home}/utils/snpEff_dbs/{db_name}/genes.gtf",pg2_home=PG2_HOME,db_name=SNPEFF_DB), protein_fa=expand("{pg2_home}/utils/snpEff_dbs/{db_name}/protein.fa",pg2_home=PG2_HOME,db_name=SNPEFF_DB)
     output: vcf="out/{study_group}/variant_calling/{cohort}.{study_group}.variant_calling_finished.snpEff.vcf.gz",tbi="out/{study_group}/variant_calling/{cohort}.{study_group}.variant_calling_finished.snpEff.vcf.gz.tbi"
     params: n="16", mem_per_cpu="4", R="'span[hosts=1] rusage[mem=4]'", J="snpEff", o="out/logs/annotate_variants.out", eo="out/logs/annotate_variants.err", \
             db_name=SNPEFF_DB, int_vcf="out/{study_group}/variant_calling/{cohort}.{study_group}.variant_calling_finished.snpEff.vcf"
-    conda: "envs/biopython.yaml"
-    shell: "snpEff -Xmx64g -c {input.snpEff_config} {params.db_name} {input.vcf} > {params.int_vcf}; bgzip {params.int_vcf}; tabix -p vcf {output.vcf}"
+    # conda: "envs/biopython.yaml"
+    singularity: 'docker://biocontainers/snpeff:v4.1k_cv3',
+    shell: "/home/biodocker/bin/snpeff -Xmx64g -c {input.snpEff_config} {params.db_name} {input.vcf} > {params.int_vcf}; bgzip {params.int_vcf}; tabix -p vcf {output.vcf}"
 
 rule SubsetAnnotatedVariantsByChr:
     input: snpEff=expand("out/{{study_group}}/variant_calling/{cohort}.{{study_group}}.variant_calling_finished.snpEff.vcf.gz",cohort=COHORT)
     output: 'out/{study_group}/novel_analysis/snpEff/{chr}.snpEff.vcf'
     params: n="1", mem_per_cpu="4", R="'rusage[mem=4]'", J="subset_annotatedVCF", o="out/logs/novel_analysis/{study_group}.subset_snpeff.out", eo="out/logs/novel_analysis/{study_group}.subset_snpeff.err"
-    conda: "envs/bcftools.yaml"
+    # conda: "envs/bcftools.yaml"
+    singularity: 'docker://pegi3s/samtools_bcftools:latest'
     shell: "bcftools view {input.snpEff} {wildcards.chr} > {output}"
 
 """
@@ -71,7 +75,7 @@ rule MapMutations:
     output: analysis='out/{study_group}/novel_analysis/{mutation_type}/{chr}.{mutation_type}.analysis'
     params: n="1", mem_per_cpu="4", R="'rusage[mem=4]'", J="map_{mutation_type}", o="out/logs/novel_analysis/{study_group}.{mutation_type}.out", eo="out/logs/novel_analysis/{study_group}.{mutation_type}.err", \
             mutation_mstrg_map='out/{study_group}/novel_analysis/{mutation_type}/{chr}.{mutation_type}.map',mutation_MQevidence_map="out/{study_group}/novel_analysis/{mutation_type}/{chr}.{mutation_type}_MQevidence.map",novelpep_mutation_map="out/{study_group}/novel_analysis/{mutation_type}/{chr}.novelPep_{mutation_type}.map"
-    conda: "envs/biopython.yaml"
+    # conda: "envs/biopython.yaml"
     shell: "python {PG2_HOME}/scripts/{wildcards.mutation_type}_snpEff.py {input.proteome} {input.annotated_vcf} {input.proteome_blast} {input.ref_db} {input.novelpep_transcript_map} {params.mutation_mstrg_map} {params.mutation_MQevidence_map} {params.novelpep_mutation_map} > {output.analysis}"
     #shell: "python3 {PG2_HOME}/scripts/{wildcards.mutation_type}_snpEff.py {input.proteome} {input.annotated_vcf} {input.proteome_blast} {input.ref_db} {input.novelpep_transcript_map} {params.mutation_mstrg_map} {params.mutation_MQevidence_map} {params.novelpep_mutation_map} > {output.analysis}"
 

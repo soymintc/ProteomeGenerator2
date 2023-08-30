@@ -64,7 +64,8 @@ if (not just_called_variants) and calling_variants:
         output: fasta=temp("out/custom_ref/chr_split/{study_group}/{cohort}.h-{htype}^{chr}.fa"),chain=temp("out/custom_ref/chr_split/{study_group}/{cohort}.h-{htype}^{chr}.chain")
         params: n="1", mem_per_cpu="4", R="'rusage[mem=4]'", J="chr-wise_customRef", o="out/logs/chr-wise/{study_group}.{htype}^{chr}.out", eo="out/logs/chr-wise/{study_group}.{htype}^{chr}.err", \
                 study_grp=COHORT+'_{study_group}'
-        conda: "envs/bcftools.yaml"
+        # conda: "envs/bcftools.yaml"
+        singularity: 'docker://pegi3s/samtools_bcftools:latest',
         shell: "samtools faidx {STOCK_GENOME_FASTA} {wildcards.chr} | bcftools consensus -s {params.study_grp} -H {wildcards.htype} -p {wildcards.htype}_ -c {output.chain} {input.vcf} > {output.fasta}"
 elif just_called_variants:
     rule genome_01_CreateChrWiseCustomRef:
@@ -72,7 +73,8 @@ elif just_called_variants:
         output: fasta=temp("out/custom_ref/chr_split/{study_group}/{cohort}.h-{htype}^{chr}.fa"),chain=temp("out/custom_ref/chr_split/{study_group}/{cohort}.h-{htype}^{chr}.chain")
         params: n="1", mem_per_cpu="4", R="'rusage[mem=4]'", J="chr-wise_customRef", o="out/logs/chr-wise/{study_group}.{htype}^{chr}.out", eo="out/logs/chr-wise/{study_group}.{htype}^{chr}.err", \
                 study_grp=COHORT+'_{study_group}'
-        conda: "envs/bcftools.yaml"
+        # conda: "envs/bcftools.yaml"
+        singularity: 'docker://pegi3s/samtools_bcftools:latest',
         shell: "samtools faidx {STOCK_GENOME_FASTA} {wildcards.chr} | bcftools consensus -s {params.study_grp} -H {wildcards.htype} -p {wildcards.htype}_ -c {output.chain} {input.vcf} > {output.fasta}"
 else:
     #TODO: implement tumor/matched normal functionality via sample name changes
@@ -81,14 +83,16 @@ else:
         output: merged_vcf="out/WGS/{cohort}.input_vcfs_merged.vcf.gz"
         #conda: "envs/myenv.yaml"
         params: n="1", mem_per_cpu="6", R="'rusage[mem=6]'", J="merge_input_vcfs", o="out/logs/merge_input_vcfs.out", eo="out/logs/merge_input_vcfs.err"
-        conda: "envs/bcftools.yaml"
-        shell: "picard MergeVcfs -Xmx6g \
-            $(echo {input.vcfs} | sed -r 's/[^ ]+/INPUT=&/g') \
-            OUTPUT={output.merged_vcf}"
+        # conda: "envs/bcftools.yaml"
+        singularity: "docker://broadinstitute/gatk"
+        shell: "gatk --java-options '-Xmx6g' MergeVcfs \
+            $(echo {input.vcfs} | sed -r 's/[^ ]+/-I &/g') \
+            -O {output.merged_vcf}"
     rule genome_01_CreateChrWiseCustomRef:
         input: merged_vcf="out/WGS/{cohort}.input_vcfs_merged.vcf.gz"
         output: fasta=temp("out/custom_ref/chr_split/{study_group}/{cohort}.h-{htype}^{chr}.fa"),chain=temp("out/custom_ref/chr_split/{study_group}/{cohort}.h-{htype}^{chr}.chain")
-        conda: "envs/bcftools.yaml"
+        # conda: "envs/bcftools.yaml"
+        singularity: 'docker://pegi3s/samtools_bcftools:latest',
         params: n="1", mem_per_cpu="4", R="'rusage[mem=4]'", J="chr-wise_customRef", o="out/logs/chr-wise/{study_group}.{htype}^{chr}.out", eo="out/logs/chr-wise/{study_group}.{htype}^{chr}.err",study_grp=COHORT+'_{study_group}'
         shell: "samtools faidx {STOCK_GENOME_FASTA} {wildcards.chr} | bcftools consensus -s {params.study_grp} -H {wildcards.htype} -p {wildcards.htype}_ -c {output.chain} {input.merged_vcf} > {output.fasta}"
 
@@ -106,19 +110,22 @@ rule genome_02b_LiftoverAnnotationGTF:
     output: "out/custom_ref/{cohort}.{study_group}.H{htype}.gtf"
     params: n="1", mem_per_cpu="4", R="'rusage[mem=4]'", J="LiftoverGTF", o="out/logs/liftover.out", eo="out/logs/liftover.err", \
             temp_gtf="out/custom_ref/{cohort}.{study_group}.H{htype}_temp.gtf"
-    conda: "envs/crossmap.yaml"
+    # conda: "envs/crossmap.yaml"
+    singularity: 'docker://crukcibioinformatics/crossmap:latest'
     shell: "CrossMap.py gff {input.chain} {input.vcf_refGtf} {params.temp_gtf}; awk '{{print \"{wildcards.htype}_\" $0}}' {params.temp_gtf} > {output}; rm {params.temp_gtf}"
 
 rule CreateRefSequenceIndex:
     input: STOCK_GENOME_FASTA
     output: STOCK_GENOME_FASTA+".fai"
     params: n="1", mem_per_cpu="18", R="'span[hosts=1] rusage[mem=18]'", o="out/logs/create_refIdx.out", eo="out/logs/create_refDict.err", J="create_refIdx"
-    conda: "envs/bcftools.yaml"
+    # conda: "envs/bcftools.yaml"
+    singularity: 'docker://pegi3s/samtools_bcftools:latest',
     shell: "samtools faidx {input}"
 
 rule CreateRefSequenceDict:
     input: STOCK_GENOME_FASTA
     output: STOCK_GENOME_FASTA.strip('fa')+'dict'
     params: n="1", mem_per_cpu="18", R="'span[hosts=1] rusage[mem=18]'", o="out/logs/create_refDict.out", eo="out/logs/create_refDict.err", J="create_refDict"
-    conda: "envs/bcftools.yaml"
-    shell: "picard -Xmx16g CreateSequenceDictionary R={input} O={output}"
+    # conda: "envs/bcftools.yaml"
+    singularity: "docker://broadinstitute/gatk"
+    shell: "gatk --java-options '-Xmx16g' CreateSequenceDictionary -R {input} -O {output}"
